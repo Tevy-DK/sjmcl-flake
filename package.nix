@@ -24,6 +24,28 @@
   jdk21,
   jdk25,
   which,
+  # Game runtime libraries.  The launcher spawns the JVM itself, so these are
+  # inherited by the game process: LWJGL's natives dlopen the graphics, audio
+  # and input libraries by soname (libGL.so.1, libvulkan.so.1, libudev.so.1,
+  # ...), which are only reachable through LD_LIBRARY_PATH on NixOS.  Without
+  # them the client dies with "There is no OpenGL context management API
+  # available".
+  addDriverRunpath,
+  alsa-lib,
+  flite,
+  libGL,
+  libdecor,
+  libpulseaudio,
+  libx11,
+  libxcursor,
+  libxext,
+  libxkbcommon,
+  libxrandr,
+  libxxf86vm,
+  pipewire,
+  udev,
+  vulkan-loader,
+  wayland,
   # Desktop integration / GSettings schemas.
   gsettings-desktop-schemas,
   hicolor-icon-theme,
@@ -91,13 +113,38 @@ stdenv.mkDerivation (finalAttrs: {
   # NixOS has no /usr/lib/jvm, so the only Java location SJMCL's discovery can
   # see is PATH (`which -a java`).  Wrapped-launcher PATH also carries `which`,
   # which is not part of NixOS's default system profile.
+  #
+  # The game JVM inherits the launcher's environment, so the runtime libraries
+  # it dlopens by soname have to be on LD_LIBRARY_PATH.  /run/opengl-driver
+  # gives the Mesa driver libraries; the rest covers OpenGL/EGL (libglvnd),
+  # Vulkan, SDL3 video/input stacks, OpenAL backends and the narrator.
   preFixup = ''
-    gappsWrapperArgs+=(--prefix PATH : "${lib.makeBinPath [
-      jdk17
-      jdk21
-      jdk25
-      which
-    ]}")
+    gappsWrapperArgs+=(
+      --prefix PATH : "${lib.makeBinPath [
+        jdk17
+        jdk21
+        jdk25
+        which
+      ]}"
+      --suffix LD_LIBRARY_PATH : "${addDriverRunpath.driverLink}/lib:${lib.makeLibraryPath [
+        (lib.getLib stdenv.cc.cc)
+        libGL
+        vulkan-loader
+        udev
+        wayland
+        libxkbcommon
+        libdecor
+        libx11
+        libxcursor
+        libxext
+        libxrandr
+        libxxf86vm
+        alsa-lib
+        libpulseaudio
+        pipewire
+        flite
+      ]}"
+    )
   '';
 
   installPhase = ''
