@@ -17,6 +17,13 @@
   libsoup_3,
   webkitgtk_4_1,
   libgcc,
+  # Java runtimes: the latest three LTS generations.  SJMCL discovers Java by
+  # scanning PATH (`which -a java`) and picks the exact major version an
+  # instance needs; the game itself is a Java program.
+  jdk17,
+  jdk21,
+  jdk25,
+  which,
   # Desktop integration / GSettings schemas.
   gsettings-desktop-schemas,
   hicolor-icon-theme,
@@ -80,6 +87,18 @@ stdenv.mkDerivation (finalAttrs: {
     gsettings-desktop-schemas
     hicolor-icon-theme
   ];
+
+  # NixOS has no /usr/lib/jvm, so the only Java location SJMCL's discovery can
+  # see is PATH (`which -a java`).  Wrapped-launcher PATH also carries `which`,
+  # which is not part of NixOS's default system profile.
+  preFixup = ''
+    gappsWrapperArgs+=(--prefix PATH : "${lib.makeBinPath [
+      jdk17
+      jdk21
+      jdk25
+      which
+    ]}")
+  '';
 
   installPhase = ''
     runHook preInstall
